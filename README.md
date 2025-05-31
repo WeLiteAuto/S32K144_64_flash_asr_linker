@@ -1,0 +1,1 @@
+# S32K144_64_flash_asr_linker
