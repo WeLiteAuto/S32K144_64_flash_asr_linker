@@ -1,0 +1,615 @@
+/*
+** ###################################################################
+**     Processor:           S32K144 with 64 KB SRAM
+**     Compiler:            IAR ANSI C/C++ Compiler for ARM
+**
+**     Abstract:
+**         Linker file for the IAR ANSI C/C++ Compiler for ARM
+**
+**     Copyright (c) 2015-2016 Freescale Semiconductor, Inc.
+**     Copyright 2017 NXP
+**     All rights reserved.
+**
+**     THIS SOFTWARE IS PROVIDED BY NXP "AS IS" AND ANY EXPRESSED OR
+**     IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+**     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+**     IN NO EVENT SHALL NXP OR ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+**     INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+**     (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+**     SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+**     HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+**     STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+**     IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+**     THE POSSIBILITY OF SUCH DAMAGE.
+**
+**     http:                 www.freescale.com
+**     mail:                 support@freescale.com
+**
+** ###################################################################
+*/
+
+/* If symbol __flash_vector_table__=1 is defined at link time
+ * the interrupt vector will not be copied to RAM.
+ * Warning: Using the interrupt vector from FLASH will not allow
+ * INT_SYS_InstallHandler because the section is Read Only.
+ */
+define symbol __ram_vector_table_size__ =  0x00000400;
+define symbol __ram_vector_table_offset__ =  0x000003FF;
+
+/* Flash */
+define symbol m_interrupts_start       = 0x00000000;
+define symbol m_interrupts_end         = 0x000003FF;
+
+define symbol m_flash_config_start     = 0x00000400;
+define symbol m_flash_config_end       = 0x0000040F;
+
+define symbol m_text_start             = 0x00000410;
+define symbol m_text_end               = 0x0007FFFF;
+
+/* SRAM_L */
+define symbol m_interrupts_ram_start   = 0x1FFF8000;
+define symbol m_interrupts_ram_end     = 0x1FFF8000 + __ram_vector_table_offset__;   //0x1FFF83FF  ram vector table
+
+define symbol m_data_start             = m_interrupts_ram_start + __ram_vector_table_size__;//0x1FFF8400
+define symbol m_data_end               = 0x1FFFFFFF;                 //sram end
+
+/* SRAM_U */
+define symbol m_data_2_start           = 0x20000000;
+define symbol m_data_2_end             = 0x20006FFF;    
+
+define symbol __size_cstack__        = 0x00000800;
+
+define symbol __size_heap__          = 0x00000400;
+
+
+define exported symbol __VECTOR_TABLE          = m_interrupts_start;
+define exported symbol __VECTOR_RAM            = m_interrupts_ram_start;
+define exported symbol __RAM_VECTOR_TABLE_SIZE = __ram_vector_table_size__;
+
+define exported symbol __RAM_START             = m_interrupts_ram_start;
+define exported symbol __RAM_END               = m_data_2_end;
+
+define memory mem with size = 4G;
+define region m_flash_config_region   = mem:[from m_flash_config_start to m_flash_config_end];
+define region VECTORS                 = mem:[from m_interrupts_start to m_interrupts_end];
+define region TEXT_region             = mem:[from m_interrupts_start to m_interrupts_end]
+                                      | mem:[from m_text_start to m_text_end];
+define region DATA_region             = mem:[from m_data_start to m_data_end];
+define region DATA_region_2           = mem:[from m_data_2_start to m_data_2_end-__size_cstack__];
+define region CSTACK_region           = mem:[from m_data_2_end-__size_cstack__+1 to m_data_2_end];
+define region m_interrupts_ram_region = mem:[from m_interrupts_ram_start to m_interrupts_ram_end];
+
+place in m_flash_config_region              { section FlashConfig };
+place in m_interrupts_ram_region            { section m_interrupts_ram };
+
+
+
+
+/* OS_EXCVEC_CORE0_CONST */
+keep { section OS_EXCVEC_CORE0_CONST_START_SEC };
+keep { section OS_EXCVEC_CORE0_CONST_LIMIT_SEC };
+define section OS_EXCVEC_CORE0_CONST_START_SEC
+{
+   public _OS_EXCVEC_CORE0_CONST_START:
+   public __OS_EXCVEC_CORE0_CONST_START:
+};
+define section OS_EXCVEC_CORE0_CONST_LIMIT_SEC
+{
+   public _OS_EXCVEC_CORE0_CONST_LIMIT:
+   public __OS_EXCVEC_CORE0_CONST_LIMIT:
+};
+define block OS_EXCVEC_CORE0_CONST with fixed order
+{
+   section OS_EXCVEC_CORE0_CONST_START_SEC,
+   block OS_EXCVEC_CORE0_CONST_BLOCK with alignment = 8 { section .OS_EXCVEC_CORE0_CONST },
+   block OS_EXCVEC_CORE0_CONST_FAST_BLOCK with alignment = 8 { section .OS_EXCVEC_CORE0_CONST_FAST },
+   section OS_EXCVEC_CORE0_CONST_LIMIT_SEC
+};
+"VECTORS__OS_EXCVEC_CORE0_CONST": place in VECTORS
+{
+   block OS_EXCVEC_CORE0_CONST
+};
+
+/* Startup_Stack */
+keep { section Startup_Stack_START_SEC };
+keep { section Startup_Stack_LIMIT_SEC };
+define section Startup_Stack_START_SEC
+{
+   public _Startup_Stack_START:
+   public __Startup_Stack_START:
+   public _Startup_Stack_VAR_ALL_START:
+};
+define section Startup_Stack_LIMIT_SEC
+{
+   public _Startup_Stack_LIMIT:
+   public __Startup_Stack_LIMIT:
+   public _Startup_Stack_VAR_ALL_LIMIT:
+};
+define block Startup_Stack with fixed order, alignment = 4
+{
+   section Startup_Stack_START_SEC,
+   block CSTACK with alignment = 8, size = __size_cstack__  { },
+   section Startup_Stack_LIMIT_SEC
+};
+"INTERNAL_RAM__Startup_Stack": place in CSTACK_region
+{
+   block Startup_Stack
+};
+/* Heap_Default */
+keep { section Heap_Default_START_SEC };
+keep { section Heap_Default_LIMIT_SEC };
+define section Heap_Default_START_SEC
+{
+   public _Heap_Default_START:
+   public __Heap_Default_START:
+   public _Heap_Default_VAR_ALL_START:
+};
+define section Heap_Default_LIMIT_SEC
+{
+   public _Heap_Default_LIMIT:
+   public __Heap_Default_LIMIT:
+   public _Heap_Default_VAR_ALL_LIMIT:
+};
+define block Heap_Default with fixed order, alignment = 4
+{
+   section Heap_Default_START_SEC,
+   block HEAP with alignment = 8, size = __size_heap__ { },
+   section Heap_Default_LIMIT_SEC
+};
+"INTERNAL_RAM__Heap_Default": place in DATA_region_2
+{
+  last  block Heap_Default
+};
+
+
+
+
+
+
+
+
+
+/////////////////////////////Zi  DATA_region_2
+/* OS_DATA_SHARED_NOINIT */
+keep { section OS_DATA_SHARED_NOINIT_START_SEC };
+keep { section OS_DATA_SHARED_NOINIT_LIMIT_SEC };
+define section OS_DATA_SHARED_NOINIT_START_SEC
+{
+   public _OS_DATA_SHARED_NOINIT_START:
+   public __OS_DATA_SHARED_NOINIT_START:
+   public _OS_DATA_SHARED_VAR_ALL_START:
+};
+define section OS_DATA_SHARED_NOINIT_LIMIT_SEC
+{
+   public _OS_DATA_SHARED_NOINIT_LIMIT:
+   public __OS_DATA_SHARED_NOINIT_LIMIT:
+};
+define block OS_DATA_SHARED_NOINIT with fixed order, alignment = 4
+{
+   section OS_DATA_SHARED_NOINIT_START_SEC,
+   block OS_BARRIER_CORE0_VAR_FAST_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_BARRIER_CORE0_VAR_FAST_NOCACHE_NOINIT },
+   block OS_BARRIER_CORE0_VAR_FAST_NOINIT_BLOCK with alignment = 8 { section .OS_BARRIER_CORE0_VAR_FAST_NOINIT },
+   block OS_BARRIER_CORE0_VAR_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_BARRIER_CORE0_VAR_NOCACHE_NOINIT },
+   block OS_BARRIER_CORE0_VAR_NOINIT_BLOCK with alignment = 8 { section .OS_BARRIER_CORE0_VAR_NOINIT },
+   block OS_CORESTATUS_CORE0_VAR_FAST_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_CORESTATUS_CORE0_VAR_FAST_NOCACHE_NOINIT },
+   block OS_CORESTATUS_CORE0_VAR_FAST_NOINIT_BLOCK with alignment = 8 { section .OS_CORESTATUS_CORE0_VAR_FAST_NOINIT },
+   block OS_CORESTATUS_CORE0_VAR_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_CORESTATUS_CORE0_VAR_NOCACHE_NOINIT },
+   block OS_CORESTATUS_CORE0_VAR_NOINIT_BLOCK with alignment = 8 { section .OS_CORESTATUS_CORE0_VAR_NOINIT },
+   block OS_GLOBALSHARED_VAR_FAST_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_GLOBALSHARED_VAR_FAST_NOCACHE_NOINIT },
+   block OS_GLOBALSHARED_VAR_FAST_NOINIT_BLOCK with alignment = 8 { section .OS_GLOBALSHARED_VAR_FAST_NOINIT },
+   block OS_GLOBALSHARED_VAR_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_GLOBALSHARED_VAR_NOCACHE_NOINIT },
+   block OS_GLOBALSHARED_VAR_NOINIT_BLOCK with alignment = 8 { section .OS_GLOBALSHARED_VAR_NOINIT },
+   block OS_PUBLIC_CORE0_VAR_FAST_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_PUBLIC_CORE0_VAR_FAST_NOCACHE_NOINIT },
+   block OS_PUBLIC_CORE0_VAR_FAST_NOINIT_BLOCK with alignment = 8 { section .OS_PUBLIC_CORE0_VAR_FAST_NOINIT },
+   block OS_PUBLIC_CORE0_VAR_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_PUBLIC_CORE0_VAR_NOCACHE_NOINIT },
+   block OS_PUBLIC_CORE0_VAR_NOINIT_BLOCK with alignment = 8 { section .OS_PUBLIC_CORE0_VAR_NOINIT },
+   block OS_VAR_FAST_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_VAR_FAST_NOCACHE_NOINIT },
+   block OS_VAR_FAST_NOINIT_BLOCK with alignment = 8 { section .OS_VAR_FAST_NOINIT },
+   block OS_VAR_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_VAR_NOCACHE_NOINIT },
+   block OS_VAR_NOINIT_BLOCK with alignment = 8 { section .OS_VAR_NOINIT },
+   section OS_DATA_SHARED_NOINIT_LIMIT_SEC
+};
+"INTERNAL_RAM__OS_DATA_SHARED_NOINIT": place in DATA_region_2
+{
+   block OS_DATA_SHARED_NOINIT
+};
+
+/* OS_CODE */
+keep { section OS_CODE_START_SEC };
+keep { section OS_CODE_LIMIT_SEC };
+define section OS_CODE_START_SEC
+{
+   public _OS_CODE_START:
+   public __OS_CODE_START:
+};
+define section OS_CODE_LIMIT_SEC
+{
+   public _OS_CODE_LIMIT:
+   public __OS_CODE_LIMIT:
+};
+define block OS_CODE with fixed order, alignment = 4
+{
+   section OS_CODE_START_SEC,
+   block OS_Adc_Adc12bsarv2_EndGroupConvUnit0_CODE_BLOCK with alignment = 8 { section .OS_Adc_Adc12bsarv2_EndGroupConvUnit0_CODE },
+   block OS_Adc_Adc12bsarv2_EndGroupConvUnit1_CODE_BLOCK with alignment = 8 { section .OS_Adc_Adc12bsarv2_EndGroupConvUnit1_CODE },
+   block OS_Application_10ms_Task_CODE_BLOCK with alignment = 8 { section .OS_Application_10ms_Task_CODE },
+   block OS_Application_2ms_Task_CODE_BLOCK with alignment = 8 { section .OS_Application_2ms_Task_CODE },
+   block OS_Application_500ms_Task_CODE_BLOCK with alignment = 8 { section .OS_Application_500ms_Task_CODE },
+   block OS_CODE_BLOCK with alignment = 8 { section .OS_CODE },
+   block OS_CanBusOffIsr_0_CODE_BLOCK with alignment = 8 { section .OS_CanBusOffIsr_0_CODE },
+   block OS_CanMailboxIsr_0_CODE_BLOCK with alignment = 8 { section .OS_CanMailboxIsr_0_CODE },
+   block OS_Default_BSW_10ms_Task_CODE_BLOCK with alignment = 8 { section .OS_Default_BSW_10ms_Task_CODE },
+   block OS_Default_BSW_20ms_Task_CODE_BLOCK with alignment = 8 { section .OS_Default_BSW_20ms_Task_CODE },
+   block OS_Default_BSW_5ms_Task_CODE_BLOCK with alignment = 8 { section .OS_Default_BSW_5ms_Task_CODE },
+   block OS_Default_BSW_ServiceDispatcher_CODE_BLOCK with alignment = 8 { section .OS_Default_BSW_ServiceDispatcher_CODE },
+   block OS_FTM_0_CH_0_CH_1_ISR_CODE_BLOCK with alignment = 8 { section .OS_FTM_0_CH_0_CH_1_ISR_CODE },
+   block OS_FTM_0_CH_2_CH_3_ISR_CODE_BLOCK with alignment = 8 { section .OS_FTM_0_CH_2_CH_3_ISR_CODE },
+   block OS_ICU_PORT_CI_A_EXT_IRQ_ISR_CODE_BLOCK with alignment = 8 { section .OS_ICU_PORT_CI_A_EXT_IRQ_ISR_CODE },
+   block OS_ICU_PORT_CI_B_EXT_IRQ_ISR_CODE_BLOCK with alignment = 8 { section .OS_ICU_PORT_CI_B_EXT_IRQ_ISR_CODE },
+   block OS_OS_COREINITHOOK_CODE_BLOCK with alignment = 8 { section .OS_OS_COREINITHOOK_CODE },
+   block OS_StartApplication_Appl_Init_Task_CODE_BLOCK with alignment = 8 { section .OS_StartApplication_Appl_Init_Task_CODE },
+   block OS_StartApplication_NVM_Task_CODE_BLOCK with alignment = 8 { section .OS_StartApplication_NVM_Task_CODE },
+   section OS_CODE_LIMIT_SEC,
+   section .mcal_text
+};
+"PROGRAM_FLASH__OS_CODE": place in TEXT_region
+{
+   block OS_CODE
+};
+/* OS_CONST */
+keep { section OS_CONST_START_SEC };
+keep { section OS_CONST_LIMIT_SEC };
+define section OS_CONST_START_SEC
+{
+   public _OS_CONST_START:
+   public __OS_CONST_START:
+};
+define section OS_CONST_LIMIT_SEC
+{
+   public _OS_CONST_LIMIT:
+   public __OS_CONST_LIMIT:
+};
+define block OS_CONST with fixed order, alignment = 4
+{
+   section OS_CONST_START_SEC,
+   block OS_CONST_BLOCK with alignment = 8 { section .OS_CONST },
+   block OS_CONST_FAST_BLOCK with alignment = 8 { section .OS_CONST_FAST },
+   block OS_CORE0_CONST_BLOCK with alignment = 8 { section .OS_CORE0_CONST },
+   block OS_CORE0_CONST_FAST_BLOCK with alignment = 8 { section .OS_CORE0_CONST_FAST },
+   block OS_GLOBALSHARED_CONST_BLOCK with alignment = 8 { section .OS_GLOBALSHARED_CONST },
+   block OS_GLOBALSHARED_CONST_FAST_BLOCK with alignment = 8 { section .OS_GLOBALSHARED_CONST_FAST },
+   block OS_INTVEC_CONST_BLOCK with alignment = 8 { section .OS_INTVEC_CONST },
+   block OS_INTVEC_CONST_FAST_BLOCK with alignment = 8 { section .OS_INTVEC_CONST_FAST },
+   block OS_SystemApplication_OsCore0_CONST_BLOCK with alignment = 8 { section .OS_SystemApplication_OsCore0_CONST },
+   block OS_SystemApplication_OsCore0_CONST_FAST_BLOCK with alignment = 8 { section .OS_SystemApplication_OsCore0_CONST_FAST },
+   section OS_CONST_LIMIT_SEC,
+   section .mcal_const,
+   section .mcal_const_cfg,
+};
+"PROGRAM_FLASH__OS_CONST": place in TEXT_region
+{
+   block OS_CONST
+};
+
+/* OS_DATA_CORE0_NOINIT */
+keep { section OS_DATA_CORE0_NOINIT_START_SEC };
+keep { section OS_DATA_CORE0_NOINIT_LIMIT_SEC };
+define section OS_DATA_CORE0_NOINIT_START_SEC
+{
+   public _OS_DATA_CORE0_NOINIT_START:
+   public __OS_DATA_CORE0_NOINIT_START:
+   public _OS_DATA_CORE0_VAR_ALL_START:
+};
+define section OS_DATA_CORE0_NOINIT_LIMIT_SEC
+{
+   public _OS_DATA_CORE0_NOINIT_LIMIT:
+   public __OS_DATA_CORE0_NOINIT_LIMIT:
+   public _OS_DATA_CORE0_VAR_ALL_LIMIT:
+};
+define block OS_DATA_CORE0_NOINIT with fixed order, alignment = 4
+{
+   section OS_DATA_CORE0_NOINIT_START_SEC,
+   block OS_CORE0_VAR_FAST_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_CORE0_VAR_FAST_NOCACHE_NOINIT },
+   block OS_CORE0_VAR_FAST_NOINIT_BLOCK with alignment = 8 { section .OS_CORE0_VAR_FAST_NOINIT },
+   block OS_CORE0_VAR_NOCACHE_NOINIT_BLOCK with alignment = 8 { section .OS_CORE0_VAR_NOCACHE_NOINIT },
+   block OS_CORE0_VAR_NOINIT_BLOCK with alignment = 8 { section .OS_CORE0_VAR_NOINIT },
+   section OS_DATA_CORE0_NOINIT_LIMIT_SEC
+};
+"INTERNAL_RAM__OS_DATA_CORE0_NOINIT": place in DATA_region_2
+{
+   block OS_DATA_CORE0_NOINIT
+};
+/* OS_INTVEC_CORE0_CODE */
+keep { section OS_INTVEC_CORE0_CODE_START_SEC };
+keep { section OS_INTVEC_CORE0_CODE_LIMIT_SEC };
+define section OS_INTVEC_CORE0_CODE_START_SEC
+{
+   public _OS_INTVEC_CORE0_CODE_START:
+   public __OS_INTVEC_CORE0_CODE_START:
+};
+define section OS_INTVEC_CORE0_CODE_LIMIT_SEC
+{
+   public _OS_INTVEC_CORE0_CODE_LIMIT:
+   public __OS_INTVEC_CORE0_CODE_LIMIT:
+};
+define block OS_INTVEC_CORE0_CODE with fixed order, alignment = 128
+{
+   section OS_INTVEC_CORE0_CODE_START_SEC,
+   block OS_INTVEC_CORE0_CODE_BLOCK with alignment = 128 { section .OS_INTVEC_CORE0_CODE },
+   section OS_INTVEC_CORE0_CODE_LIMIT_SEC
+};
+"PROGRAM_FLASH__OS_INTVEC_CORE0_CODE": place in TEXT_region
+{
+   block OS_INTVEC_CORE0_CODE
+};
+/* OS_INTVEC_CORE0_CONST */
+keep { section OS_INTVEC_CORE0_CONST_START_SEC };
+keep { section OS_INTVEC_CORE0_CONST_LIMIT_SEC };
+define section OS_INTVEC_CORE0_CONST_START_SEC
+{
+   public _OS_INTVEC_CORE0_CONST_START:
+   public __OS_INTVEC_CORE0_CONST_START:
+};
+define section OS_INTVEC_CORE0_CONST_LIMIT_SEC
+{
+   public _OS_INTVEC_CORE0_CONST_LIMIT:
+   public __OS_INTVEC_CORE0_CONST_LIMIT:
+};
+define block OS_INTVEC_CORE0_CONST with fixed order, alignment = 128
+{
+   section OS_INTVEC_CORE0_CONST_START_SEC,
+   block OS_INTVEC_CORE0_CONST_BLOCK with alignment = 128 { section .OS_INTVEC_CORE0_CONST },
+   block OS_INTVEC_CORE0_CONST_FAST_BLOCK with alignment = 128 { section .OS_INTVEC_CORE0_CONST_FAST },
+   section OS_INTVEC_CORE0_CONST_LIMIT_SEC
+};
+"VECTORS__OS_INTVEC_CORE0_CONST": place in TEXT_region
+{
+   block OS_INTVEC_CORE0_CONST
+};
+
+/* Const_Default */
+keep { section Const_Default_START_SEC };
+keep { section Const_Default_LIMIT_SEC };
+define section Const_Default_START_SEC
+{
+   public _Const_Default_START:
+   public __Const_Default_START:
+};
+define section Const_Default_LIMIT_SEC
+{
+   public _Const_Default_LIMIT:
+   public __Const_Default_LIMIT:
+};
+define block Const_Default with fixed order, alignment = 4
+{
+   section Const_Default_START_SEC,
+   block DEFAULT_RODATA_BLOCK with alignment = 8 { section .rodata },
+   block DEFAULT_INTVEC_BLOCK with alignment = 8 { section .intvec },
+   block DEFAULT_INIT_TABLE_BLOCK with alignment = 8 { section .iar.init_table },
+   block DEFAULT_DATA_ROM_INIT_BLOCK with alignment = 8 { section .data_init },
+   section Const_Default_LIMIT_SEC
+};
+"PROGRAM_FLASH__Const_Default": place in TEXT_region
+{
+   block Const_Default
+};
+
+/* Code_Default */
+keep { section Code_Default_START_SEC };
+keep { section Code_Default_LIMIT_SEC };
+define section Code_Default_START_SEC
+{
+   public _Code_Default_START:
+   public __Code_Default_START:
+};
+define section Code_Default_LIMIT_SEC
+{
+   public _Code_Default_LIMIT:
+   public __Code_Default_LIMIT:
+};
+define block Code_Default with fixed order, alignment = 4
+{
+   section Code_Default_START_SEC,
+   block DEFAULT_CODE_BLOCK with alignment = 8 { section .text },
+   block OS_Default_Init_Task_CODE_BLOCK with alignment = 8 { section .OS_Default_Init_Task_CODE },
+   block OS_ERRORHOOK_CODE_BLOCK with alignment = 8 { section .OS_ERRORHOOK_CODE },
+   section Code_Default_LIMIT_SEC
+};
+"PROGRAM_FLASH__Code_Default": place in TEXT_region
+{
+   block Code_Default
+};
+/* OS_STACKS_CORE0_NOINIT */
+keep { section OS_STACKS_CORE0_NOINIT_START_SEC };
+keep { section OS_STACKS_CORE0_NOINIT_LIMIT_SEC };
+define section OS_STACKS_CORE0_NOINIT_START_SEC
+{
+   public _OS_STACKS_CORE0_NOINIT_START:
+   public __OS_STACKS_CORE0_NOINIT_START:
+   public _OS_STACKS_CORE0_VAR_ALL_START:
+};
+define section OS_STACKS_CORE0_NOINIT_LIMIT_SEC
+{
+   public _OS_STACKS_CORE0_NOINIT_LIMIT:
+   public __OS_STACKS_CORE0_NOINIT_LIMIT:
+   public _OS_STACKS_CORE0_VAR_ALL_LIMIT:
+};
+define block OS_STACKS_CORE0_NOINIT with fixed order, alignment = 4
+{
+   section OS_STACKS_CORE0_NOINIT_START_SEC,
+/* Stack: Default_Appl_Task (2048 Byte) */
+block OS_STACK_DEFAULT_APPL_TASK_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_DEFAULT_APPL_TASK_VAR_NOINIT },
+
+/* Stack: Default_BSW_Async_Task (4096 Byte) */
+block OS_STACK_DEFAULT_BSW_ASYNC_TASK_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_DEFAULT_BSW_ASYNC_TASK_VAR_NOINIT },
+
+/* Stack: OsCore0_Error (1024 Byte) */
+block OS_STACK_OSCORE0_ERROR_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_ERROR_VAR_NOINIT },
+
+/* Stack: OsCore0_Init (2048 Byte) */
+block OS_STACK_OSCORE0_INIT_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_INIT_VAR_NOINIT },
+
+/* Stack: OsCore0_Isr_Core (1024 Byte) */
+block OS_STACK_OSCORE0_ISR_CORE_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_ISR_CORE_VAR_NOINIT },
+
+/* Stack: OsCore0_Kernel (1024 Byte) */
+block OS_STACK_OSCORE0_KERNEL_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_KERNEL_VAR_NOINIT },
+
+/* Stack: OsCore0_Protection (1024 Byte) */
+block OS_STACK_OSCORE0_PROTECTION_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_PROTECTION_VAR_NOINIT },
+
+
+/* Stack: OsCore0_Task_Prio10 (1024 Byte) */
+block OS_STACK_OSCORE0_TASK_PRIO0_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_TASK_PRIO0_VAR_NOINIT },
+
+/* Stack: OsCore0_Task_Prio10 (1024 Byte) */
+block OS_STACK_OSCORE0_TASK_PRIO10_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_TASK_PRIO10_VAR_NOINIT },
+
+/* Stack: OsCore0_Task_Prio10 (1024 Byte) */
+block OS_STACK_OSCORE0_TASK_PRIO100_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_TASK_PRIO100_VAR_NOINIT },
+
+/* Stack: OsCore0_Task_BSW_SCHM (1024 Byte) */
+block OS_STACK_OSTASK_BSW_VAR_NOINIT_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSTASK_BSW_VAR_NOINIT },			
+
+/* Stack: OsCore0_Task_Prio4294967295 (1024 Byte) */
+block OS_STACK_OSCORE0_TASK_PRIO4294967295_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_TASK_PRIO4294967295_VAR_NOINIT },
+
+/* Stack: OsCore0_Task_Prio45 (1024 Byte) */
+block OS_STACK_OSCORE0_TASK_PRIO45_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_TASK_PRIO45_VAR_NOINIT },
+
+/* Stack: OsCore0_Task_Prio5 (1024 Byte) */
+block OS_STACK_OSCORE0_TASK_PRIO5_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_TASK_PRIO5_VAR_NOINIT },
+
+/* Stack: OsCore0_Task_Prio50 (2048 Byte) */
+block OS_STACK_OSCORE0_TASK_PRIO50_VAR_NOINIT_BLOCK with alignment = 32 { section .OS_STACK_OSCORE0_TASK_PRIO50_VAR_NOINIT },
+
+   section OS_STACKS_CORE0_NOINIT_LIMIT_SEC
+};
+"INTERNAL_RAM__OS_STACKS_CORE0_NOINIT": place in DATA_region_2
+{
+   block OS_STACKS_CORE0_NOINIT
+};
+
+/* BSS_Default */
+keep { section BSS_Default_START_SEC };
+keep { section BSS_Default_LIMIT_SEC };
+define section BSS_Default_START_SEC
+{
+   public _BSS_Default_START:
+   public __BSS_Default_START:
+   public _BSS_Default_VAR_ALL_START:
+};
+define section BSS_Default_LIMIT_SEC
+{
+   public _BSS_Default_LIMIT:
+   public __BSS_Default_LIMIT:
+};
+define block BSS_Default with fixed order, alignment = 4
+{
+   section BSS_Default_START_SEC,
+   block DEFAULT_BSS_BLOCK with alignment = 8 { section .bss },
+   block DEFAULT_DATA_INIT_BLOCK with alignment = 8 { section .data },
+   section BSS_Default_LIMIT_SEC
+};
+"INTERNAL_RAM__BSS_Default": place in DATA_region_2
+{
+   block BSS_Default
+};
+////////////////////////////ro DATA_region
+
+initialize manually {
+   section .OS_BARRIER_CORE0_VAR,
+   section .OS_BARRIER_CORE0_VAR_FAST,
+   section .OS_BARRIER_CORE0_VAR_FAST_NOCACHE,
+   section .OS_BARRIER_CORE0_VAR_NOCACHE,
+   section .OS_CORESTATUS_CORE0_VAR,
+   section .OS_CORESTATUS_CORE0_VAR_FAST,
+   section .OS_CORESTATUS_CORE0_VAR_FAST_NOCACHE,
+   section .OS_CORESTATUS_CORE0_VAR_NOCACHE,
+   section .OS_GLOBALSHARED_VAR,
+   section .OS_GLOBALSHARED_VAR_FAST,
+   section .OS_GLOBALSHARED_VAR_FAST_NOCACHE,
+   section .OS_GLOBALSHARED_VAR_NOCACHE,
+   section .OS_PUBLIC_CORE0_VAR,
+   section .OS_PUBLIC_CORE0_VAR_FAST,
+   section .OS_PUBLIC_CORE0_VAR_FAST_NOCACHE,
+   section .OS_PUBLIC_CORE0_VAR_NOCACHE,
+   section .OS_VAR,
+   section .OS_VAR_FAST,
+   section .OS_VAR_FAST_NOCACHE,
+   section .OS_VAR_NOCACHE,
+   section .function_in_ram,
+   section .data
+};
+
+do not initialize {
+   section .OS_STACK_APPLICATION_10MS_TASK_VAR_NOINIT,
+   section .OS_STACK_APPLICATION_500MS_TASK_VAR_NOINIT,
+   section .OS_STACK_DEFAULT_BSW_10MS_TASK_VAR_NOINIT,
+   section .OS_STACK_DEFAULT_BSW_20MS_TASK_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_ERROR_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_INIT_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_ISR_CORE_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_KERNEL_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_TASK_PRIO40_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_TASK_PRIO4294967295_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_TASK_PRIO45_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_TASK_PRIO50_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_TASK_PRIO5_VAR_NOINIT,
+   section .OS_STACK_OSCORE0_TASK_PRIO60_VAR_NOINIT,
+   section .OS_STACK_STARTAPPLICATION_NVM_TASK_VAR_NOINIT,
+   section .OS_SystemApplication_OsCore0_VAR_FAST_NOCACHE_NOINIT,
+   section .OS_SystemApplication_OsCore0_VAR_FAST_NOINIT,
+   section .OS_SystemApplication_OsCore0_VAR_NOCACHE_NOINIT,
+   section .OS_SystemApplication_OsCore0_VAR_NOINIT,
+   section .OS_CORE0_VAR_FAST_NOCACHE_NOINIT,
+   section .OS_CORE0_VAR_FAST_NOINIT,
+   section .OS_CORE0_VAR_NOCACHE_NOINIT,
+   section .OS_CORE0_VAR_NOINIT,
+   section .OS_BARRIER_CORE0_VAR_FAST_NOCACHE_NOINIT,
+   section .OS_BARRIER_CORE0_VAR_FAST_NOCACHE_ZERO_INIT,
+   section .OS_BARRIER_CORE0_VAR_FAST_NOINIT,
+   section .OS_BARRIER_CORE0_VAR_FAST_ZERO_INIT,
+   section .OS_BARRIER_CORE0_VAR_NOCACHE_NOINIT,
+   section .OS_BARRIER_CORE0_VAR_NOCACHE_ZERO_INIT,
+   section .OS_BARRIER_CORE0_VAR_NOINIT,
+   section .OS_BARRIER_CORE0_VAR_ZERO_INIT,
+   section .OS_CORESTATUS_CORE0_VAR_FAST_NOCACHE_NOINIT,
+   section .OS_CORESTATUS_CORE0_VAR_FAST_NOCACHE_ZERO_INIT,
+   section .OS_CORESTATUS_CORE0_VAR_FAST_NOINIT,
+   section .OS_CORESTATUS_CORE0_VAR_FAST_ZERO_INIT,
+   section .OS_CORESTATUS_CORE0_VAR_NOCACHE_NOINIT,
+   section .OS_CORESTATUS_CORE0_VAR_NOCACHE_ZERO_INIT,
+   section .OS_CORESTATUS_CORE0_VAR_NOINIT,
+   section .OS_CORESTATUS_CORE0_VAR_ZERO_INIT,
+   section .OS_GLOBALSHARED_VAR_FAST_NOCACHE_NOINIT,
+   section .OS_GLOBALSHARED_VAR_FAST_NOCACHE_ZERO_INIT,
+   section .OS_GLOBALSHARED_VAR_FAST_NOINIT,
+   section .OS_GLOBALSHARED_VAR_FAST_ZERO_INIT,
+   section .OS_GLOBALSHARED_VAR_NOCACHE_NOINIT,
+   section .OS_GLOBALSHARED_VAR_NOCACHE_ZERO_INIT,
+   section .OS_GLOBALSHARED_VAR_NOINIT,
+   section .OS_GLOBALSHARED_VAR_ZERO_INIT,
+   section .OS_PUBLIC_CORE0_VAR_FAST_NOCACHE_NOINIT,
+   section .OS_PUBLIC_CORE0_VAR_FAST_NOCACHE_ZERO_INIT,
+   section .OS_PUBLIC_CORE0_VAR_FAST_NOINIT,
+   section .OS_PUBLIC_CORE0_VAR_FAST_ZERO_INIT,
+   section .OS_PUBLIC_CORE0_VAR_NOCACHE_NOINIT,
+   section .OS_PUBLIC_CORE0_VAR_NOCACHE_ZERO_INIT,
+   section .OS_PUBLIC_CORE0_VAR_NOINIT,
+   section .OS_PUBLIC_CORE0_VAR_ZERO_INIT,
+   section .OS_VAR_FAST_NOCACHE_NOINIT,
+   section .OS_VAR_FAST_NOCACHE_ZERO_INIT,
+   section .OS_VAR_FAST_NOINIT,
+   section .OS_VAR_FAST_ZERO_INIT,
+   section .OS_VAR_NOCACHE_NOINIT,
+   section .OS_VAR_NOCACHE_ZERO_INIT,
+   section .OS_VAR_NOINIT,
+   section .OS_VAR_ZERO_INIT,
+   section .bss,
+   readwrite
+};
+
+
+
+
